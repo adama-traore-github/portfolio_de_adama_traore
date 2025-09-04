@@ -1,0 +1,76 @@
+name: CI/CD Portfolio
+
+on:
+  push:
+    branches:
+      - main   # ou master selon ta branche par défaut
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Récupérer le repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Installer Node.js (pour utiliser npm/yarn et outils lint/minify)
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # 3. Installer les dépendances (eslint, stylelint, html-minifier, imagemin…)
+      - name: Install dependencies
+        run: |
+          npm install -g eslint stylelint html-minifier terser clean-css-cli imagemin-cli
+
+      # 4. Lint JavaScript
+      - name: Lint JavaScript
+        run: eslint ./script --ext .js || true
+
+      # 5. Lint CSS
+      - name: Lint CSS
+        run: stylelint "css/**/*.css" || true
+
+      # 6. Minify HTML
+      - name: Minify HTML
+        run: |
+          npx html-minifier --input-dir ./ --output-dir ./dist --collapse-whitespace --remove-comments --minify-css true --minify-js true --file-ext html
+
+      # 7. Minify CSS
+      - name: Minify CSS
+        run: |
+          mkdir -p dist/css
+          npx cleancss -o dist/css/style.css css/style.css
+
+      # 8. Minify JS
+      - name: Minify JS
+        run: |
+          mkdir -p dist/script
+          npx terser script/script.js -o dist/script/script.js
+
+      # 9. Optimiser les images
+      - name: Optimize Images
+        run: |
+          mkdir -p dist/images
+          npx imagemin images/* --out-dir=dist/images
+
+      # 10. Copier index.html (déjà minifié dans dist)
+      - name: Copy index.html
+        run: cp dist/index.html dist/
+
+      # 11. Déployer sur GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+      # 12. (Optionnel) Notification Discord
+      - name: Notify Discord
+        if: success()
+        uses: Ilshidur/action-discord@master
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          args: "✅ Nouveau déploiement réussi pour le portfolio d’Adama !"
